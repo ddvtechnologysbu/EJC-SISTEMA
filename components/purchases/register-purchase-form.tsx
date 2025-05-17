@@ -68,6 +68,7 @@ export default function RegisterPurchaseForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [purchaseSuccess, setPurchaseSuccess] = useState(false)
+  const [discount, setDiscount] = useState(0)
 
   // Inicializar o formulário
   const form = useForm<PurchaseFormValues>({
@@ -160,7 +161,7 @@ export default function RegisterPurchaseForm() {
         throw new Error(`Erro ao criar compra: ${purchaseError.message}`)
       }
 
-      // Criar os itens da compra
+      // Criar os itens da compra, incluindo o desconto como item negativo se houver desconto
       const purchaseItems = data.items.map((item) => ({
         purchase_id: purchase.id,
         product_name: item.product_name,
@@ -170,6 +171,18 @@ export default function RegisterPurchaseForm() {
         subtotal: calculateSubtotal(Number(item.quantity), Number(item.unit_price)),
         notes: item.notes,
       }))
+
+      if (discount > 0) {
+        purchaseItems.push({
+          purchase_id: purchase.id,
+          product_name: "Desconto",
+          unit_of_measure: "unidade",
+          quantity: 1,
+          unit_price: -discount,
+          subtotal: -discount,
+          notes: "Desconto aplicado manualmente",
+        })
+      }
 
       const { error: itemsError } = await supabaseClient.from("purchase_items").insert(purchaseItems)
 
@@ -471,9 +484,34 @@ export default function RegisterPurchaseForm() {
                 Adicionar Item
               </Button>
 
-              <div className="flex justify-between items-center pt-4 border-t">
-                <h3 className="text-lg font-semibold">Total da Compra</h3>
-                <p className="text-xl font-bold">{formatCurrency(calculateTotal())}</p>
+              <div className="flex justify-between items-center pt-4 border-t flex-col md:flex-row md:items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="discount" className="font-semibold">
+                    Desconto (R$):
+                  </label>
+                  <input
+                    id="discount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discount}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value)
+                      if (!isNaN(value) && value >= 0) {
+                        setDiscount(value)
+                      } else if (e.target.value === "") {
+                        setDiscount(0)
+                      }
+                    }}
+                    className="border rounded px-2 py-1 w-24 text-right"
+                  />
+                </div>
+                <div className="flex justify-between items-center w-full md:w-auto">
+                  <h3 className="text-lg font-semibold">Total da Compra</h3>
+                  <p className="text-xl font-bold">
+                    {formatCurrency(Math.max(calculateTotal() - discount, 0))}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
